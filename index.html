@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="vi" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Công Cụ Tính Thuế TNCN Nhận Thay</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- html2canvas for image export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #f8fafc; /* slate-50 */
+            --card-bg-color: #ffffff; /* white */
+            --text-primary-color: #020617; /* slate-950 */
+            --text-secondary-color: #475569; /* slate-600 */
+            --border-color: #e2e8f0; /* slate-200 */
+            --accent-color: #4f46e5; /* indigo-600 */
+        }
+
+        html.dark {
+            --bg-color: #0f172a; /* slate-900 */
+            --card-bg-color: #1e293b; /* slate-800 */
+            --text-primary-color: #f8fafc; /* slate-50 */
+            --text-secondary-color: #94a3b8; /* slate-400 */
+            --border-color: #334155; /* slate-700 */
+            --accent-color: #818cf8; /* indigo-400 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-secondary-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+    </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="antialiased">
+    <div id="app-container" class="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 text-slate-800 dark:text-slate-200">
+        <!-- App content will be rendered here by JavaScript -->
+    </div>
+
+    <script type="module">
+        import { GoogleGenAI, Type } from "https://aistudiocdn.com/@google/genai@^1.21.0";
+
+        // --- CONFIGURATION ---
+        // !!! QUAN TRỌNG: Dán khóa API Gemini của bạn vào đây.
+        const API_KEY = 'PASTE_YOUR_GEMINI_API_KEY_HERE';
+
+        // --- CONSTANTS ---
+        const PERSONAL_DEDUCTION = 11000000;
+        const DEPENDENT_DEDUCTION = 4400000;
+        const TAX_BRACKETS = [
+            { level: 1, max: 5000000, rate: 0.05 }, { level: 2, max: 10000000, rate: 0.10 },
+            { level: 3, max: 18000000, rate: 0.15 }, { level: 4, max: 32000000, rate: 0.20 },
+            { level: 5, max: 52000000, rate: 0.25 }, { level: 6, max: 80000000, rate: 0.30 },
+            { level: 7, max: Infinity, rate: 0.35 },
+        ];
+        const BANKS = [
+            { "name": "Ngân hàng TMCP Công thương Việt Nam", "code": "ICB", "bin": "970415", "short_name": "VietinBank" }, { "name": "Ngân hàng TMCP Ngoại Thương Việt Nam", "code": "VCB", "bin": "970436", "short_name": "Vietcombank" },
+            { "name": "Ngân hàng TMCP Quân đội", "code": "MB", "bin": "970422", "short_name": "MBBank" }, { "name": "Ngân hàng TMCP Á Châu", "code": "ACB", "bin": "970416", "short_name": "ACB" },
+            { "name": "Ngân hàng TMCP Việt Nam Thịnh Vượng", "code": "VPB", "bin": "970432", "short_name": "VPBank" }, { "name": "Ngân hàng TMCP Tiên Phong", "code": "TPB", "bin": "970423", "short_name": "TPBank" },
+            { "name": "Ngân hàng TMCP Hàng Hải", "code": "MSB", "bin": "970426", "short_name": "MSB" }, { "name": "Ngân hàng TMCP Bưu Điện Liên Việt", "code": "LPB", "bin": "970449", "short_name": "LienVietPostBank" },
+            { "name": "Ngân hàng TMCP Bản Việt", "code": "VCCB", "bin": "970454", "short_name": "VietCapitalBank" }, { "name": "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam", "code": "BIDV", "bin": "970418", "short_name": "BIDV" },
+            { "name": "Ngân hàng TMCP Sài Gòn Thương Tín", "code": "STB", "bin": "970403", "short_name": "Sacombank" }, { "name": "Ngân hàng TMCP Quốc tế Việt Nam", "code": "VIB", "bin": "970441", "short_name": "VIB" },
+            { "name": "Ngân hàng TMCP Phát triển Thành phố Hồ Chí Minh", "code": "HDB", "bin": "970437", "short_name": "HDBank" }, { "name": "Ngân hàng TMCP Đông Nam Á", "code": "SEAB", "bin": "970440", "short_name": "SeABank" },
+            { "name": "Ngân hàng TNHH MTV Shinhan Việt Nam", "code": "SHBVN", "bin": "970424", "short_name": "ShinhanBank" }, { "name": "Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam", "code": "VBA", "bin": "970405", "short_name": "Agribank" },
+            { "name": "Ngân hàng TMCP Kỹ thương Việt Nam", "code": "TCB", "bin": "970407", "short_name": "Techcombank" }, { "name": "Ngân hàng TMCP Bắc Á", "code": "BAB", "bin": "970409", "short_name": "BacABank" },
+            { "name": "Ngân hàng TMCP An Bình", "code": "ABB", "bin": "970425", "short_name": "ABBANK" }, { "name": "Ngân hàng TMCP Xuất Nhập khẩu Việt Nam", "code": "EIB", "bin": "970431", "short_name": "Eximbank" },
+            { "name": "Ngân hàng TNHH MTV Public Việt Nam", "code": "PBVN", "bin": "970439", "short_name": "PublicBank" }, { "name": "Ngân hàng TMCP Phương Đông", "code": "OCB", "bin": "970448", "short_name": "OCB" },
+            { "name": "Ngân hàng TMCP Kiên Long", "code": "KLB", "bin": "970452", "short_name": "KienLongBank" },
+        ];
+        const bankOptions = BANKS.map(b => ({ value: b.short_name, label: `${b.short_name} - ${b.name}` })).sort((a, b) => a.label.localeCompare(b.label));
+
+        // --- ICONS (as string templates) ---
+        const ICONS = {
+            user: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>`,
+            money: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path d="M8.433 7.418c.158-.103.346-.196.567-.267v1.698a2.5 2.5 0 00-1.168-.217c-1.22-.05-1.92.65-1.92 1.542 0 .91.698 1.482 1.92 1.482.511 0 .962-.132 1.168-.217v1.698c-.22.07-.408.163-.567-.267C8.07 13.94 7.5 14.5 7.5 15.5c0 .828.672 1.5 1.5 1.5s1.5-.672 1.5-1.5c0-1.002-.57-1.56-1.067-1.918-.158-.103-.346-.196-.567-.267v-1.698a2.5 2.5 0 001.168.217c1.22.05 1.92-.65 1.92-1.542 0-.91-.698-1.482-1.92-1.482-.511 0-.962-.132-1.168.217V6.082c.22-.07.408-.163.567-.267C11.93 5.44 12.5 4.88 12.5 3.878c0-.828-.672-1.5-1.5-1.5s-1.5.672-1.5 1.5c0 1.002.57 1.56 1.067 1.918zM10 18a8 8 0 100-16 8 8 0 000 16z" /></svg>`,
+            users: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>`,
+            gift: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 5a3 3 0 015.252-2.121l.738.737a.5.5 0 00.708 0l.737-.737A3 3 0 0115 5v2a1 1 0 01-1 1H6a1 1 0 01-1-1V5zM6 9a1 1 0 00-1 1v3a1 1 0 001 1h8a1 1 0 001-1v-3a1 1 0 00-1-1H6z" clip-rule="evenodd" /></svg>`,
+            shield: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>`,
+            building: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" /></svg>`,
+            upload: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>`,
+            download: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>`,
+            spinner: `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`,
+            trash: (small = false) => `<svg xmlns="http://www.w3.org/2000/svg" class="${small ? 'h-4 w-4 mr-1' : 'h-5 w-5 mr-2'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`,
+            bank: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>`,
+            qr: `<svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-slate-400 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /><path stroke-linecap="round" stroke-linejoin="round" d="M5 5h.01M5 12h.01M5 19h.01M12 5h.01M12 19h.01M19 5h.01M19 12h.01M19 19h.01" /><path stroke-linecap="round" stroke-linejoin="round" d="M5 5h2M5 5v2M19 5h-2M19 5v2M5 19h2M5 19v-2M19 19h-2M19 19v-2" /></svg>`,
+            save: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002 2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>`,
+            load: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M4 12a8 8 0 0114.83-5.29" /></svg>`,
+            history: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+            search: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>`,
+        };
+
+        // --- STATE MANAGEMENT ---
+        let state = {
+            name: '', totalIncome: 0, dependents: 0, proxyAmount: 0, insurance: 0, unionFee: 0,
+            bankAccount: '', bankCode: '', qrDescription: '',
+            results: null, savedCalculations: [], qrCodeUrl: '',
+            isProcessing: false, error: null, showTaxBrackets: false, showProxyTooltip: false,
+        };
+        const appContainer = document.getElementById('app-container');
+
+        // --- DATABASE LOGIC ---
+        let db;
+        const initDB = () => new Promise((resolve, reject) => {
+            if (db) return resolve(db);
+            const request = indexedDB.open('TaxCalculatorDB', 1);
+            request.onerror = (e) => reject('DB Error');
+            request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+            request.onupgradeneeded = (e) => {
+                const dbInstance = e.target.result;
+                if (!dbInstance.objectStoreNames.contains('calculations')) {
+                    dbInstance.createObjectStore('calculations', { keyPath: 'id', autoIncrement: true });
+                }
+            };
+        });
+        const saveCalculation = (calc) => new Promise(async (resolve, reject) => {
+            const db = await initDB();
+            const tx = db.transaction('calculations', 'readwrite');
+            tx.objectStore('calculations').add(calc);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject('Save failed');
+        });
+        const getCalculations = () => new Promise(async (resolve, reject) => {
+            const db = await initDB();
+            const tx = db.transaction('calculations', 'readonly');
+            const request = tx.objectStore('calculations').getAll();
+            request.onsuccess = () => resolve(request.result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+            request.onerror = () => reject('Fetch failed');
+        });
+        const deleteCalculation = (id) => new Promise(async (resolve, reject) => {
+            const db = await initDB();
+            const tx = db.transaction('calculations', 'readwrite');
+            tx.objectStore('calculations').delete(id);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject('Delete failed');
+        });
+
+        // --- CORE LOGIC ---
+        const formatCurrency = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(value));
+        
+        const calculateProgressiveTax = (assessableIncome) => {
+            if (assessableIncome <= 0) return 0;
+            let tax = 0;
+            let remainingIncome = assessableIncome;
+            for (let i = 0; i < TAX_BRACKETS.length; i++) {
+                const bracket = TAX_BRACKETS[i];
+                const prevMax = i > 0 ? TAX_BRACKETS[i - 1].max : 0;
+                if (remainingIncome > 0) {
+                    const incomeInBracket = Math.min(remainingIncome, bracket.max - prevMax);
+                    tax += incomeInBracket * bracket.rate;
+                    remainingIncome -= incomeInBracket;
+                } else break;
+            }
+            return tax;
+        };
+        
+        const calculateTax = () => {
+            if (state.totalIncome <= 0) {
+                state.results = null;
+                return;
+            }
+            const personalDeduction = PERSONAL_DEDUCTION;
+            const dependentDeductions = state.dependents * DEPENDENT_DEDUCTION;
+            const totalDeductions = personalDeduction + dependentDeductions + state.insurance + state.unionFee;
+
+            const assessableIncomeWithProxy = Math.max(0, state.totalIncome - totalDeductions);
+            const totalTaxWithProxy = calculateProgressiveTax(assessableIncomeWithProxy);
+            
+            const incomeWithoutProxy = state.totalIncome > state.proxyAmount ? state.totalIncome - state.proxyAmount : 0;
+            const assessableIncomeWithoutProxy = Math.max(0, incomeWithoutProxy - totalDeductions);
+            const totalTaxWithoutProxy = calculateProgressiveTax(assessableIncomeWithoutProxy);
+            
+            const taxOnProxyAmount = Math.abs(totalTaxWithProxy - totalTaxWithoutProxy);
+            
+            state.results = {
+                totalTaxWithProxy, assessableIncomeWithProxy, incomeWithoutProxy, assessableIncomeWithoutProxy, totalTaxWithoutProxy, taxOnProxyAmount,
+                personalDeduction, dependentDeductions, insuranceDeductions: state.insurance, unionFeeDeduction: state.unionFee, totalDeductions
+            };
+            if (taxOnProxyAmount > 0 && !state.qrDescription) {
+                state.qrDescription = `HOAN TIEN THUE CHECH LECH DO NHAN THAY`;
+            }
+        };
+        
+        const updateQRCode = () => {
+            const selectedBank = BANKS.find(b => b.short_name === state.bankCode);
+            if (state.results?.taxOnProxyAmount > 0 && state.bankAccount && selectedBank) {
+                const amount = Math.round(state.results.taxOnProxyAmount);
+                const encodedDescription = encodeURIComponent(state.qrDescription || `Hoan thue TNCN cho ${state.name || 'ban'}`);
+                state.qrCodeUrl = `https://qr.sepay.vn/img?acc=${state.bankAccount}&bank=${selectedBank.bin}&amount=${amount}&des=${encodedDescription}&template=compact`;
+            } else {
+                state.qrCodeUrl = '';
+            }
+        };
+
+        const processAndResizeImage = (file) => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 1024; let width = img.width; let height = img.height;
+                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                    canvas.width = width; canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                    resolve({ base64Data: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
+                };
+                img.onerror = reject;
+            };
+            reader.onerror = reject;
+        });
+
+        // --- RENDER & EVENT HANDLING ---
+        function render() {
+            calculateTax();
+            updateQRCode();
+
+            const appHTML = `
+                <header class="text-center mb-10">
+                    <h1 class="text-4xl font-extrabold text-slate-900 dark:text-slate-100">Công Cụ Tính Thuế TNCN Nhận Thay</h1>
+                    <p class="text-lg text-slate-500 dark:text-slate-400 mt-3 max-w-3xl mx-auto">
+                        Hỗ trợ tính số tiền thuế chênh lệch do nhận THƯỞNG/KHOÁN thay siêu thị.
+                    </p>
+                </header>
+
+                ${state.error ? `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r-lg" role="alert"><p>${state.error}</p></div>` : ''}
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    <div class="lg:col-span-1 space-y-6">
+                        ${renderInputPanel()}
+                        ${renderHistoryPanel()}
+                    </div>
+                    <div class="lg:col-span-2 space-y-8">
+                        ${state.results && state.totalIncome > 0 ? renderResultPanel() : ''}
+                    </div>
+                </div>
+
+                <div class="mt-12 text-center">
+                    <button id="toggle-brackets-btn" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium text-sm">
+                        ${state.showTaxBrackets ? 'Ẩn' : 'Hiện'} Biểu Thuế Lũy Tiến
+                    </button>
+                    ${state.showTaxBrackets ? renderTaxBracketTable() : ''}
+                </div>
+            `;
+            appContainer.innerHTML = appHTML;
+            attachEventListeners();
+        }
+        
+        function createInputRowHTML({ label, id, value, placeholder, isCurrency = true, icon, highlightLabel = false, isNumeric = false }) {
+            const displayValue = typeof value === 'number' && value > 0 ? (isCurrency ? value.toLocaleString('vi-VN') : value.toString()) : '';
+            const numericAttrs = isNumeric ? `inputmode="numeric" pattern="[0-9]*"` : '';
+            return `
+                <div>
+                    <label for="${id}" class="block font-medium mb-1 ${highlightLabel ? 'text-xl font-bold text-red-600 dark:text-red-400' : 'text-sm text-slate-700 dark:text-slate-300'}">${label}</label>
+                    <div class="relative">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">${icon}</div>
+                        <input type="text" id="${id}" value="${displayValue}" placeholder="${placeholder}" ${numericAttrs} class="block w-full rounded-lg border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700/50 pl-10 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11"/>
+                        ${isCurrency ? `<span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 sm:text-sm">VND</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        function createTextInputRowHTML({ label, id, value, placeholder, icon }) {
+             return `
+                <div>
+                    <label for="${id}" class="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">${label}</label>
+                    <div class="relative">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">${icon}</div>
+                        <input type="text" id="${id}" value="${value}" placeholder="${placeholder}" class="block w-full rounded-lg border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700/50 pl-10 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11"/>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createSearchableSelectHTML({ label, id, value, icon, options, placeholder }) {
+            const selectedOption = options.find(opt => opt.value === value);
+            // This is simplified for a static render. A real implementation would require more JS for the dropdown logic.
+            return `
+                <div>
+                    <label for="${id}" class="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">${label}</label>
+                    <div class="relative">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">${icon}</div>
+                        <select id="${id}" class="block w-full rounded-lg border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700/50 pl-10 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11">
+                            <option value="">${placeholder}</option>
+                            ${options.map(opt => `<option value="${opt.value}" ${opt.value === value ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderInputPanel() {
+            const proxyTooltipHTML = state.showProxyTooltip ? `
+                <div class="absolute z-10 -top-14 right-0 w-64 p-3 text-sm text-white bg-slate-900 rounded-lg shadow-lg transition-opacity duration-300 pointer-events-none animate-bounce">
+                    <div class="relative">
+                        <div class="font-bold">Đã nhận diện phiếu lương!</div>
+                        <div class="text-slate-300">Vui lòng nhập "Tiền nhận thay" để tính thuế chênh lệch.</div>
+                        <div class="absolute -bottom-5 right-3 w-0 h-0 border-l-[10px] border-l-transparent border-t-[10px] border-t-slate-900 border-r-[10px] border-r-transparent"></div>
+                    </div>
+                </div>
+            ` : '';
+
+            return `
+                <div class="bg-white dark:bg-slate-800 p-6 lg:p-8 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 space-y-6">
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Thông tin tính thuế</h2>
+                    <div class="text-sm text-slate-600 dark:text-slate-400 space-y-3 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <p>Tải ảnh chụp phiếu lương để hệ thống tự động trích xuất thông tin chính.</p>
+                        <p class="font-semibold">Hướng dẫn chụp ảnh:</p>
+                        <ul class="list-decimal list-inside space-y-1">
+                            <li>Click vào <a href="https://newinsite.thegioididong.com/hrm/chi-tiet-luong" target="_blank" rel="noopener noreferrer" class="font-bold text-red-600 dark:text-red-500 hover:underline">"Chi tiết thưởng"</a> tại đây.</li>
+                            <li>Bấm vào dòng <strong class="text-indigo-600 dark:text-indigo-400">"Tổng tiền giảm trừ"</strong> để mở rộng.</li>
+                            <li>Chụp toàn màn hình (đảm bảo thấy được STK).</li>
+                            <li>Chọn <strong class="text-indigo-600 dark:text-indigo-400">"Tải ảnh phiếu lương (AI)"</strong>.</li>
+                            <li>Nhập <strong class="text-red-600 dark:text-red-400">"Số tiền nhận thay"</strong>.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <label for="image-upload" class="relative w-full flex items-center justify-center px-4 py-3 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${state.isProcessing ? 'bg-slate-200 dark:bg-slate-700 border-slate-400' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-300 dark:border-slate-600 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:border-indigo-400'}">
+                            ${state.isProcessing ? ICONS.spinner : ICONS.upload}
+                            <span class="text-sm font-semibold ${state.isProcessing ? 'text-slate-600' : 'text-slate-700 dark:text-slate-300'}">${state.isProcessing ? 'Đang xử lý...' : 'Tải ảnh phiếu lương (AI)'}</span>
+                        </label>
+                        <input id="image-upload" type="file" class="sr-only" accept="image/*" ${state.isProcessing ? 'disabled' : ''} />
+                    </div>
+                    ${createTextInputRowHTML({label: "Họ và tên", id: "name", value: state.name, placeholder: "VD: Nguyễn Văn A", icon: ICONS.user})}
+                    ${createInputRowHTML({label: "Tổng thu nhập chịu thuế", id: "total-income", value: state.totalIncome, placeholder: "Thu nhập trước khi giảm trừ", icon: ICONS.money, isNumeric: true})}
+                    ${createInputRowHTML({label: "Số người phụ thuộc", id: "dependents", value: state.dependents, placeholder: "0", isCurrency: false, icon: ICONS.users, isNumeric: true})}
+                    <div class="relative">
+                        ${createInputRowHTML({label: "Số tiền nhận thay", id: "proxy-amount", value: state.proxyAmount, placeholder: "Tiền thưởng, hoa hồng...", icon: ICONS.gift, highlightLabel: true, isNumeric: true})}
+                        ${proxyTooltipHTML}
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Các khoản giảm trừ khác (nếu có)</p>
+                        <div class="space-y-3 pl-2 border-l-2 border-slate-200 dark:border-slate-700">
+                            ${createInputRowHTML({label: "Bảo hiểm bắt buộc", id: "insurance", value: state.insurance, placeholder: "BHXH, BHYT, BHTN...", icon: ICONS.shield, isNumeric: true})}
+                            ${createInputRowHTML({label: "Phí công đoàn", id: "union-fee", value: state.unionFee, placeholder: "Nếu có", icon: ICONS.building, isNumeric: true})}
+                        </div>
+                    </div>
+                    <div class="flex gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                        <button id="reset-btn" class="flex-1 inline-flex justify-center items-center py-2 px-4 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm bg-white dark:bg-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600">${ICONS.trash()} Xóa</button>
+                        <button id="save-btn" class="flex-1 inline-flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-700">${ICONS.save} Lưu</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderHistoryPanel() {
+            if (state.savedCalculations.length === 0) return '';
+            return `
+                <div class="bg-white dark:bg-slate-800 p-6 lg:p-8 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700">
+                    <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-3">${ICONS.history} Lịch sử tính toán</h3>
+                    <div class="max-h-96 overflow-y-auto space-y-2 pr-2">
+                        ${state.savedCalculations.map(calc => `
+                            <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg flex justify-between items-center group">
+                                <div class="space-y-1">
+                                    <p class="font-semibold text-slate-800 dark:text-slate-200">${calc.name}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">Tổng thu nhập: ${formatCurrency(calc.totalIncome)}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">Lưu lúc: ${new Date(calc.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                                </div>
+                                <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button class="load-btn flex items-center text-xs font-semibold py-1 px-2 rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200" data-id="${calc.id}">${ICONS.load} Tải</button>
+                                    <button class="delete-btn flex items-center text-xs font-semibold py-1 px-2 rounded-md bg-red-100 text-red-700 hover:bg-red-200" data-id="${calc.id}">${ICONS.trash(true)} Xóa</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderResultPanel() {
+            const r = state.results;
+            return `
+                <div id="results-panel" class="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700">
+                    <div class="p-6 lg:p-8">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-semibold text-indigo-600 dark:text-indigo-400 uppercase">Tiền thuế chênh lệch</p>
+                                <p class="text-5xl font-extrabold text-red-600 dark:text-red-400 my-2">${formatCurrency(r.taxOnProxyAmount)}</p>
+                                <p class="text-slate-500 dark:text-slate-400">Đây là số tiền thuế TNCN phát sinh từ khoản nhận thay <strong class="font-medium text-slate-700 dark:text-slate-300">${formatCurrency(state.proxyAmount)}</strong>.</p>
+                            </div>
+                            <button id="export-btn" class="inline-flex items-center gap-2 py-2 px-3 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">${ICONS.download} Xuất ảnh</button>
+                        </div>
+                        <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                            <div class="space-y-4">
+                                <h4 class="text-lg font-bold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-700 pb-2">Thông tin thanh toán</h4>
+                                ${createSearchableSelectHTML({label: "Ngân hàng", id: "bank-code", value: state.bankCode, icon: ICONS.bank, options: bankOptions, placeholder: "Chọn ngân hàng"})}
+                                ${createTextInputRowHTML({label: "Số tài khoản", id: "bank-account", value: state.bankAccount, placeholder: "Nhập số tài khoản", icon: ICONS.bank})}
+                                ${createTextInputRowHTML({label: "Nội dung chuyển khoản", id: "qr-description", value: state.qrDescription, placeholder: "VD: HOAN THUE TNCN", icon: ICONS.bank})}
+                            </div>
+                            <div class="flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
+                                ${state.qrCodeUrl ? `<img src="${state.qrCodeUrl}" alt="QR Code" class="w-48 h-48 object-contain rounded-md" />` : `<div class="flex flex-col items-center gap-2 text-center text-slate-500">${ICONS.qr}<p class="text-sm">Mã QR sẽ hiện ở đây khi bạn điền đủ thông tin ngân hàng.</p></div>`}
+                            </div>
+                        </div>
+                        <div class="mt-8 border-t border-slate-200 dark:border-slate-700 pt-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="text-lg font-bold text-indigo-600 dark:text-indigo-400">Chi tiết tính toán</h4>
+                                ${state.name ? `<div class="text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/50 px-3 py-1 rounded-full">Họ và tên: <span class="font-bold">${state.name}</span></div>` : ''}
+                            </div>
+                            <div class="space-y-2 mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
+                                <div class="flex justify-between items-center py-2"><p class="text-sm text-slate-600 dark:text-slate-300">Tổng thu nhập</p><p class="text-base text-right font-medium text-slate-800 dark:text-slate-100 sensitive-data" data-original="${formatCurrency(state.totalIncome)}">${formatCurrency(state.totalIncome)}</p></div>
+                                <div class="flex justify-between items-center py-2"><p class="text-sm text-slate-600 dark:text-slate-300">Tổng giảm trừ</p><p class="text-base text-right font-medium text-slate-800 dark:text-slate-100 sensitive-data" data-original="${formatCurrency(r.totalDeductions)}">${formatCurrency(r.totalDeductions)}</p></div>
+                                <div class="flex justify-between items-center py-2 pl-4"><p class="text-sm text-slate-500 dark:text-slate-400">   - Giảm trừ bản thân</p><p class="text-base text-right font-medium text-slate-600 dark:text-slate-300">${formatCurrency(r.personalDeduction)}</p></div>
+                                <div class="flex justify-between items-center py-2 pl-4"><p class="text-sm text-slate-500 dark:text-slate-400">   - Giảm trừ người phụ thuộc</p><p class="text-base text-right font-medium text-slate-600 dark:text-slate-300">${formatCurrency(r.dependentDeductions)}</p></div>
+                                <div class="flex justify-between items-center py-2 pl-4"><p class="text-sm text-slate-500 dark:text-slate-400">   - Bảo hiểm, phí công đoàn</p><p class="text-base text-right font-medium text-slate-600 dark:text-slate-300">${formatCurrency(r.insuranceDeductions + r.unionFeeDeduction)}</p></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+                                <div class="space-y-2">
+                                    <h5 class="font-semibold text-red-600 dark:text-red-500">Khi bao gồm tiền nhận thay</h5>
+                                    <div class="flex justify-between items-center py-2"><p class="text-sm text-slate-600 dark:text-slate-300">Thu nhập tính thuế</p><p class="text-base text-right font-medium text-slate-800 dark:text-slate-100 sensitive-data" data-original="${formatCurrency(r.assessableIncomeWithProxy)}">${formatCurrency(r.assessableIncomeWithProxy)}</p></div>
+                                    <div class="flex justify-between items-center py-2"><p class="text-sm text-slate-600 dark:text-slate-300">Tổng thuế phải nộp</p><p class="text-base text-right font-medium text-slate-800 dark:text-slate-100">${formatCurrency(r.totalTaxWithProxy)}</p></div>
+                                </div>
+                                <div class="space-y-2 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 md:pl-8 md:border-l border-dashed border-slate-300 dark:border-slate-600">
+                                    <h5 class="font-semibold text-green-600 dark:text-green-500">Khi KHÔNG gồm tiền nhận thay</h5>
+                                    <div class="flex justify-between items-center py-2"><p class="text-sm text-slate-600 dark:text-slate-300">Thu nhập tính thuế</p><p class="text-base text-right font-medium text-slate-800 dark:text-slate-100 sensitive-data" data-original="${formatCurrency(r.assessableIncomeWithoutProxy)}">${formatCurrency(r.assessableIncomeWithoutProxy)}</p></div>
+                                    <div class="flex justify-between items-center py-2"><p class="text-sm text-slate-600 dark:text-slate-300">Tổng thuế phải nộp</p><p class="text-base text-right font-medium text-slate-800 dark:text-slate-100">${formatCurrency(r.totalTaxWithoutProxy)}</p></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTaxBracketTable() {
+            return `
+                <div class="bg-white dark:bg-slate-800 p-6 lg:p-8 rounded-xl shadow-lg mt-8 border border-slate-200 dark:border-slate-700">
+                  <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Biểu Thuế Lũy Tiến Từng Phần</h3>
+                  <div class="overflow-x-auto"><table class="min-w-full"><thead class="bg-slate-100 dark:bg-slate-700/50"><tr><th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider rounded-tl-lg">Bậc</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Thu Nhập Tính Thuế / Tháng</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider rounded-tr-lg">Thuế Suất</th></tr></thead><tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">${TAX_BRACKETS.map((bracket, index) => { const prevMax = index > 0 ? TAX_BRACKETS[index-1].max : 0; const incomeRange = bracket.max === Infinity ? `Trên ${formatCurrency(prevMax)}` : `${formatCurrency(prevMax + 1)} - ${formatCurrency(bracket.max)}`; return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"><td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">${bracket.level}</td><td class="px-4 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">${incomeRange}</td><td class="px-4 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300 font-semibold">${bracket.rate * 100}%</td></tr>`}).join('')}</tbody></table></div>
+                </div>
+            `;
+        }
+
+        const handleInputAndRender = (e, updateStateFunc) => {
+            const { id } = e.target;
+            updateStateFunc(e.target.value);
+            render();
+            const newElement = document.getElementById(id);
+            if (newElement) {
+                newElement.focus();
+                const len = newElement.value.length;
+                newElement.setSelectionRange(len, len);
+            }
+        };
+        
+        function attachEventListeners() {
+            // Input listeners
+            document.getElementById('name').addEventListener('input', (e) => handleInputAndRender(e, (value) => { state.name = value; }));
+            document.getElementById('total-income').addEventListener('input', (e) => handleInputAndRender(e, (value) => { state.totalIncome = Number(value.replace(/[^0-9]/g, '')); }));
+            document.getElementById('dependents').addEventListener('input', (e) => handleInputAndRender(e, (value) => { state.dependents = Number(value.replace(/[^0-9]/g, '')); }));
+            document.getElementById('proxy-amount').addEventListener('input', (e) => handleInputAndRender(e, (value) => { state.proxyAmount = Number(value.replace(/[^0-9]/g, '')); }));
+            document.getElementById('insurance').addEventListener('input', (e) => handleInputAndRender(e, (value) => { state.insurance = Number(value.replace(/[^0-9]/g, '')); }));
+            document.getElementById('union-fee').addEventListener('input', (e) => handleInputAndRender(e, (value) => { state.unionFee = Number(value.replace(/[^0-9]/g, '')); }));
+            
+            // AI Upload
+            document.getElementById('image-upload').addEventListener('change', async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                Object.keys(state).forEach(k => {
+                    if(typeof state[k] === 'string') state[k] = '';
+                    if(typeof state[k] === 'number') state[k] = 0;
+                    if(k === 'results') state[k] = null;
+                    if(k === 'error') state[k] = null;
+                });
+                state.isProcessing = true;
+                render();
+                
+                try {
+                    const { base64Data, mimeType } = await processAndResizeImage(file);
+                    const ai = new GoogleGenAI({ apiKey: API_KEY });
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-2.5-flash',
+                        contents: { parts: [ { inlineData: { mimeType, data: base64Data } }, { text: `Phân tích phiếu lương trong hình ảnh này. Trích xuất chính xác các giá trị sau: "fullName", "totalIncome" (tổng thu nhập chịu thuế), "dependents" (số người phụ thuộc), "totalInsurance" (tổng các khoản bảo hiểm), "unionFee" (phí công đoàn), "bankAccount", "bankName". Trả về 0 cho số không tìm thấy, chuỗi rỗng cho chữ không tìm thấy.` } ] },
+                        config: { responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { fullName: { type: Type.STRING }, totalIncome: { type: Type.NUMBER }, dependents: { type: Type.NUMBER }, totalInsurance: { type: Type.NUMBER }, unionFee: { type: Type.NUMBER }, bankAccount: { type: Type.STRING }, bankName: { type: Type.STRING } }, required: ["fullName", "totalIncome", "dependents", "totalInsurance", "unionFee", "bankAccount", "bankName"] } }
+                    });
+                    const data = JSON.parse(response.text);
+                    state.name = data.fullName || '';
+                    state.totalIncome = data.totalIncome || 0;
+                    state.dependents = data.dependents ?? 0;
+                    state.insurance = data.totalInsurance || 0;
+                    state.unionFee = data.unionFee || 0;
+                    state.bankAccount = data.bankAccount || '';
+                    if (data.bankName) {
+                        const aiBankName = data.bankName.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+                        if (aiBankName) {
+                            const foundBank = BANKS.find(b => aiBankName.includes(b.short_name.toLowerCase()) || (aiBankName.length > 3 && b.name.toLowerCase().replace(/[^a-z0-9]/g, '').includes(aiBankName)));
+                            if (foundBank) state.bankCode = foundBank.short_name;
+                        }
+                    }
+                    state.showProxyTooltip = true;
+                    setTimeout(() => { state.showProxyTooltip = false; render(); }, 4000);
+                } catch (err) {
+                    state.error = "Không thể xử lý hình ảnh. Vui lòng thử lại hoặc nhập tay.";
+                } finally {
+                    state.isProcessing = false;
+                    render();
+                }
+            });
+            
+            // Result panel listeners
+            if (state.results) {
+                document.getElementById('bank-account').addEventListener('input', (e) => handleInputAndRender(e, (value) => { state.bankAccount = value; }));
+                document.getElementById('bank-code').addEventListener('change', (e) => handleInputAndRender(e, (value) => { state.bankCode = value; }));
+                document.getElementById('qr-description').addEventListener('input', (e) => handleInputAndRender(e, (value) => { state.qrDescription = value; }));
+                document.getElementById('export-btn').addEventListener('click', () => {
+                     const resultsPanel = document.getElementById('results-panel');
+                     if (!resultsPanel) return;
+                     
+                     // Hide sensitive data
+                     const sensitiveElements = resultsPanel.querySelectorAll('.sensitive-data');
+                     sensitiveElements.forEach(el => {
+                         el.innerText = '***';
+                     });
+
+                     html2canvas(resultsPanel, { scale: 2, useCORS: true, backgroundColor: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff' })
+                       .then(canvas => {
+                         const link = document.createElement('a');
+                         link.download = `ket-qua-thue-tncn-${state.name.replace(/\s/g, '_') || 'unknown'}.png`;
+                         link.href = canvas.toDataURL('image/png', 1.0);
+                         link.click();
+                         
+                         // Restore sensitive data
+                         sensitiveElements.forEach(el => {
+                             el.innerText = el.getAttribute('data-original');
+                         });
+                     }).catch(err => {
+                         // Restore sensitive data on error
+                         sensitiveElements.forEach(el => {
+                             el.innerText = el.getAttribute('data-original');
+                         });
+                     });
+                });
+            }
+            
+            // Action button listeners
+            document.getElementById('reset-btn').addEventListener('click', () => {
+                Object.keys(state).forEach(k => {
+                    if(typeof state[k] === 'string') state[k] = '';
+                    if(typeof state[k] === 'number') state[k] = 0;
+                    if(k === 'results') state[k] = null;
+                });
+                render();
+            });
+            document.getElementById('save-btn').addEventListener('click', async () => {
+                if (state.totalIncome <= 0) { state.error = 'Vui lòng nhập thu nhập để lưu.'; render(); return; }
+                const calcToSave = { name: state.name || 'Chưa đặt tên', totalIncome: state.totalIncome, dependents: state.dependents, proxyAmount: state.proxyAmount, insurance: state.insurance, unionFee: state.unionFee, createdAt: new Date().toISOString() };
+                await saveCalculation(calcToSave);
+                state.savedCalculations = await getCalculations();
+                render();
+            });
+            document.getElementById('toggle-brackets-btn').addEventListener('click', () => { state.showTaxBrackets = !state.showTaxBrackets; render(); });
+            
+            // History listeners
+            document.querySelectorAll('.load-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = Number(e.currentTarget.dataset.id);
+                    const calc = state.savedCalculations.find(c => c.id === id);
+                    if (calc) {
+                        state.name = calc.name === 'Chưa đặt tên' ? '' : calc.name;
+                        state.totalIncome = calc.totalIncome; state.dependents = calc.dependents;
+                        state.proxyAmount = calc.proxyAmount; state.insurance = calc.insurance; state.unionFee = calc.unionFee;
+                        render();
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                });
+            });
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = Number(e.currentTarget.dataset.id);
+                    if (id && window.confirm('Bạn có chắc chắn muốn xóa mục này?')) {
+                        await deleteCalculation(id);
+                        state.savedCalculations = await getCalculations();
+                        render();
+                    }
+                });
+            });
+        }
+        
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await initDB();
+                state.savedCalculations = await getCalculations();
+            } catch (err) {
+                state.error = "Không thể tải lịch sử tính toán.";
+            }
+            render();
+        });
+
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

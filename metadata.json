@@ -1,0 +1,7 @@
+{
+  "name": "tinhthue_Netify",
+  "description": "Một công cụ độc lập để tính toán thuế Thu nhập cá nhân (TNCN) phát sinh từ các khoản thưởng/khoán nhận thay. Hỗ trợ trích xuất thông tin từ ảnh phiếu lương bằng AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
