@@ -166,6 +166,7 @@
         };
         
         const calculateTax = () => {
+            console.log('calculateTax called, state:', state);
             if (state.totalIncome <= 0) {
                 state.results = null;
                 return;
@@ -187,6 +188,7 @@
                 totalTaxWithProxy, assessableIncomeWithProxy, incomeWithoutProxy, assessableIncomeWithoutProxy, totalTaxWithoutProxy, taxOnProxyAmount,
                 personalDeduction, dependentDeductions, insuranceDeductions: state.insurance, unionFeeDeduction: state.unionFee, totalDeductions
             };
+            console.log('calculateTax results:', state.results);
             if (taxOnProxyAmount > 0 && !state.qrDescription) {
                 state.qrDescription = `HOAN TIEN THUE CHECH LECH DO NHAN THAY`;
             }
@@ -448,6 +450,7 @@
         const handleInputAndRender = (e, updateStateFunc) => {
             const { id } = e.target;
             updateStateFunc(e.target.value);
+            console.log('State updated for', id, ':', state);
             render();
             const newElement = document.getElementById(id);
             if (newElement) {
